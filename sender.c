@@ -1,0 +1,53 @@
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <arpa/inet.h>
+
+struct UdpHeader
+{
+    u_short src_port;
+    u_short targ_port;
+    u_short length;
+    u_short checksum;
+};
+
+char message[] = "Hello there!\n";
+char msgbuf[1024];
+
+int main()
+{
+    int sock;
+    struct sockaddr_in addr;
+    struct UdpHeader header;
+
+    sock = socket(AF_INET, SOCK_RAW, IPPROTO_UDP);
+    if(sock < 0)
+    {
+        perror("socket");
+        exit(1);
+    }
+
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    //addr.sin_addr.s_addr = inet_addr("192.168.222.230");
+    
+    header.targ_port = htons(3425);
+    header.length = htons(sizeof(header)+sizeof(message));
+    header.checksum = 0;
+    
+    memcpy((void *)msgbuf, (void *)&header, sizeof(header));
+    memcpy((void *)(msgbuf+sizeof(header)), (void *)message, sizeof(message));
+
+    sendto(sock, msgbuf, sizeof(header)+sizeof(message), 0,
+           (struct sockaddr *)&addr, sizeof(addr));
+
+    //printf("%s \n", msgbuf);
+    write(1, (const void*) msgbuf, sizeof(msgbuf));
+    close(sock);
+
+    return 0;
+}
