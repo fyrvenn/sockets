@@ -23,9 +23,9 @@ struct UdpHeader
 };
 
 struct globalArgs_t {
-	char *IP;				/* -I option */
+	char *IP;  			/* -I option */
 	const char * interface;		/* -i option */
-	int Time;	/* -t option */
+	int Time;			/* -t option */
 
 } globalArgs;
 
@@ -122,7 +122,7 @@ void sigint(int a)
 
 void display_usage( void )
 {
-	printf("\nUsage:\n ./ubus_receiver --time=TIME --ip=IP-ADDRESS --interface=INTERFACE...\n \n");
+    printf("\nUsage:\n ./ubus_receiver --time=TIME --ip=IP-ADDRESS --interface=INTERFACE...\n \n");
     printf("Parameters:\n");
     printf(" -I, --ip\t\tip-address (required)\n");
     printf(" -i, --interface\tnetwork interface (required)\n");
@@ -166,14 +166,14 @@ int main(int argc, char **argv)
                 display_version();                              
 				break;
 				
-			case 'h':	/* fall-through is intentional */
+			case 'h':	
 			case '?':
 			case 0:
 				display_usage();
 				break;
 			
 			default:
-				/* You won't actually get here. */
+				
 				break;
 		}		
 		opt = getopt_long( argc, argv, optString, longOpts, &longIndex );
@@ -243,7 +243,7 @@ int main(int argc, char **argv)
     }
     int f = 0;
     f = setsockopt(sock, SOL_SOCKET, SO_BINDTODEVICE, arg_interface, strlen(arg_interface));
-    // printf("Flag = %i\n", f);    
+    
     if (!(f==0)){
         perror("setsockopt failed");
         exit(5);
