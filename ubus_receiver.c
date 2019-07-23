@@ -11,6 +11,7 @@
 #include <libubox/blobmsg_json.h>
 #include <signal.h>
 #include <time.h>
+#include <getopt.h>
 #include <pthread.h> 
 
 struct UdpHeader
@@ -21,6 +22,24 @@ struct UdpHeader
     u_short checksum;
 };
 
+struct globalArgs_t {
+	char *IP;				/* -I option */
+	const char * interface;		/* -i option */
+	int Time;	/* -t option */
+
+} globalArgs;
+
+static const char *optString = "I:i:t:vh?";
+
+static const struct option longOpts[] = {
+	{ "ip", required_argument, NULL, 'I' },
+	{ "interface", required_argument, NULL, 'i' },
+	{ "time", required_argument, NULL, 't' },
+	{ "version", no_argument, NULL, 'v' },
+	{ "help", no_argument, NULL, 'h' },
+	{ NULL, no_argument, NULL, 0 }
+};
+
 time_t rawtime;
 struct tm * timeinfo;
 
@@ -28,10 +47,10 @@ pthread_mutex_t m_mutex;
 void *dst, *thread_function();
 static struct blob_buf b;
 char *buf, **argv, *internet_addr;
-int time_to_exit = 0, sock, bbi, bytes_read;
+int  sock, bbi, bytes_read = 0;
 char str[INET_ADDRSTRLEN];
 const char *arg_interface = "lo";
-
+__useconds_t time_to_exit = 0;
 struct stat{
     uint32_t pkts;
     uint32_t bytes;
@@ -101,17 +120,73 @@ void sigint(int a)
     exit(2);
 }
 
+void display_usage( void )
+{
+	printf("\nUsage:\n ./ubus_receiver --time=TIME --ip=IP-ADDRESS --interface=INTERFACE...\n \n");
+    printf("Parameters:\n");
+    printf(" -I, --ip\t\tip-address (required)\n");
+    printf(" -i, --interface\tnetwork interface (required)\n");
+    printf(" -t, --time\t\twaiting time in milliseconds (required)\n\n");
+    printf(" -h, --help\t\tdisplay this help\n -v, --version\t\tdisplay version\n");
+    exit( EXIT_FAILURE );
+}
+
+void display_version( void )
+{
+	printf( "Version 2.0\n");  
+	exit( EXIT_FAILURE );
+}
+
 int main(int argc, char **argv)
 {    
     dst = malloc(sizeof(struct in6_addr));
-    int bytes_read;
+    int opt = 0, longIndex =0;
+
+    globalArgs.interface = NULL;
+    globalArgs.IP = NULL;
+    globalArgs.Time = 0;
     
-    if (argc != 4)
+    opt = getopt_long( argc, argv, optString, longOpts, &longIndex );
+
+    while( opt != -1 ) {
+		switch( opt ) {
+			case 'I':
+				globalArgs.IP = optarg; //ip-address
+				break;
+				
+			case 'i':
+				globalArgs.interface = optarg; //network interface
+				break;
+				
+			case 't':
+				globalArgs.Time = atoi(optarg); //milliseconds of waiting
+				break;
+				
+			case 'v':
+                display_version();                              
+				break;
+				
+			case 'h':	/* fall-through is intentional */
+			case '?':
+			case 0:
+				display_usage();
+				break;
+			
+			default:
+				/* You won't actually get here. */
+				break;
+		}		
+		opt = getopt_long( argc, argv, optString, longOpts, &longIndex );
+	}
+
+    if ((globalArgs.interface == NULL)||(globalArgs.IP == NULL)||(globalArgs.Time == 0))
     {
-        printf("Wrong arguments. Input time and IP.\n");
-        return -1;
+        printf("Not enough arguments.\n");   
+        display_usage();         
+        exit(7);
     }
-    int s = inet_pton(AF_INET, argv[2], dst);
+    
+    int s = inet_pton(AF_INET, globalArgs.IP, dst);
     if (s <= 0) {
         if (s == 0)
             fprintf(stderr, "Internet address is in incorrectr format.\n");
@@ -120,7 +195,7 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
-    if (argc == 4 && !sizeof(argv[2])==16) {    
+    if (!sizeof(globalArgs.IP)==16) {    
         fprintf(stderr, "Failed to parse message data.\n");
         return -2;
     }
@@ -154,11 +229,11 @@ int main(int argc, char **argv)
         exit(4);
 	}
 
-    time_to_exit = atoi(argv[1]+'\0');
-    printf("Wait %i seconds \n", time_to_exit);
-    internet_addr = argv[2];
+    time_to_exit = globalArgs.Time;
+    printf("Wait %i milliseconds \n", time_to_exit);
+    internet_addr = globalArgs.IP;
     printf("Internet address: %s\n", internet_addr);
-    arg_interface = argv[3];
+    arg_interface = globalArgs.interface;
     printf("Network interface: %s\n", arg_interface);
     signal(SIGINT, sigint);
     pthread_t thread1, thread2;
@@ -168,7 +243,7 @@ int main(int argc, char **argv)
     }
     int f = 0;
     f = setsockopt(sock, SOL_SOCKET, SO_BINDTODEVICE, arg_interface, strlen(arg_interface));
-    printf("Flag = %i\n", f);    
+    // printf("Flag = %i\n", f);    
     if (!(f==0)){
         perror("setsockopt failed");
         exit(5);
@@ -187,7 +262,9 @@ int main(int argc, char **argv)
         printf ( "Current local time and date: %s", asctime (timeinfo) );
 
         pthread_mutex_unlock(&m_mutex);
-        sleep(time_to_exit);
+        usleep(time_to_exit*1000);
+
     }       
     return 0;
+    
 }
