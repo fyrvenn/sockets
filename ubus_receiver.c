@@ -23,13 +23,13 @@ struct UdpHeader
 };
 
 struct globalArgs_t {
-	char *IP;  			/* -I option */
+	char *IP;				/* -I option */
 	const char * interface;		/* -i option */
-	int Time;			/* -t option */
+	int Time;	/* -t option */
 
 } globalArgs;
 
-static const char *optString = "I:i:t:vh?";
+static const char *optString = "I:i:t:vhd?";
 
 static const struct option longOpts[] = {
 	{ "ip", required_argument, NULL, 'I' },
@@ -37,6 +37,7 @@ static const struct option longOpts[] = {
 	{ "time", required_argument, NULL, 't' },
 	{ "version", no_argument, NULL, 'v' },
 	{ "help", no_argument, NULL, 'h' },
+    { "debug", no_argument, NULL, 'd' },
 	{ NULL, no_argument, NULL, 0 }
 };
 
@@ -47,7 +48,7 @@ pthread_mutex_t m_mutex;
 void *dst, *thread_function();
 static struct blob_buf b;
 char *buf, **argv, *internet_addr;
-int  sock, bbi, bytes_read = 0;
+int  sock, bbi, bytes_read = 0, debug = 0;
 char str[INET_ADDRSTRLEN];
 const char *arg_interface = "lo";
 __useconds_t time_to_exit = 0;
@@ -66,18 +67,21 @@ void* read_stat(void *args)
     addr.sin_family = PF_INET;
     addr.sin_addr.s_addr = inet_addr(internet_addr);
     
-    printf("Packets: %i, bytes: %i\n", stat_gl.pkts, stat_gl.bytes);
+    if(debug)
+        printf("Packets: %i, bytes: %i\n", stat_gl.pkts, stat_gl.bytes);
     while(1){
         bytes_read = recvfrom(sock, buf, 1024, 0, ((struct sockaddr *)&addr_remote), &s_t);
         inet_ntop(AF_INET, &(addr_remote.sin_addr), str, INET_ADDRSTRLEN);
-        printf("Address: %s\n", str);
+        if(debug)
+            printf("Address: %s\n", str);
         if(addr_remote.sin_addr.s_addr == addr.sin_addr.s_addr)
         {
             pthread_mutex_lock(&m_mutex);
             stat_gl.bytes+=bytes_read;
             stat_gl.pkts++;
             pthread_mutex_unlock(&m_mutex);
-            printf("Packets: %i, bytes: %i\n", stat_gl.pkts, stat_gl.bytes);  
+            if(debug)
+                printf("Packets: %i, bytes: %i\n", stat_gl.pkts, stat_gl.bytes);  
         }                    
     }
 
@@ -122,18 +126,20 @@ void sigint(int a)
 
 void display_usage( void )
 {
-    printf("\nUsage:\n ./ubus_receiver --time=TIME --ip=IP-ADDRESS --interface=INTERFACE...\n \n");
+	printf("\nUsage:\n ./ubus_receiver --time=TIME --ip=IP-ADDRESS --interface=INTERFACE...\n \n");
     printf("Parameters:\n");
     printf(" -I, --ip\t\tip-address (required)\n");
     printf(" -i, --interface\tnetwork interface (required)\n");
     printf(" -t, --time\t\twaiting time in milliseconds (required)\n\n");
     printf(" -h, --help\t\tdisplay this help\n -v, --version\t\tdisplay version\n");
+    printf(" -d, --debug\t\tswitch on debug mode\n");
     exit( EXIT_FAILURE );
 }
 
 void display_version( void )
 {
-	printf( "Version 2.0\n");  
+	printf( "Version 2.0\n\n"); 
+	printf( "ubus_receiver - сервис, который принимает пакеты через RAW-сокет с выбранного интерфейса и отправляет статистику по ubus.\n\n"); 
 	exit( EXIT_FAILURE );
 }
 
@@ -165,7 +171,10 @@ int main(int argc, char **argv)
 			case 'v':
                 display_version();                              
 				break;
-				
+			case 'd':
+                debug = 1;
+                break;
+
 			case 'h':	
 			case '?':
 			case 0:
@@ -256,10 +265,12 @@ int main(int argc, char **argv)
         if (ubus_send(ctx, 1)==1) {
             printf("Data sending failed!!\n");
         }
-                
-        time ( &rawtime );
-        timeinfo = localtime ( &rawtime );
-        printf ( "Current local time and date: %s", asctime (timeinfo) );
+
+        if(debug){
+            time ( &rawtime );
+            timeinfo = localtime ( &rawtime );
+            printf ( "Current local time and date: %s", asctime (timeinfo) );
+        }        
 
         pthread_mutex_unlock(&m_mutex);
         usleep(time_to_exit*1000);

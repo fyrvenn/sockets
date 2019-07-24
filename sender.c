@@ -33,7 +33,6 @@ int main()
 
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    //addr.sin_addr.s_addr = inet_addr("192.168.222.230");
     
     header.targ_port = htons(3425);
     header.length = htons(sizeof(header)+sizeof(message));
