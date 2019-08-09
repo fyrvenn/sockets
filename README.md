@@ -26,7 +26,7 @@ The result ot statistics counting will be located in terminal with `ubus listen`
 
 ## External Dependencies
 
-*GCC compiler
+* GCC compiler
 
 Libraries:
 * libubus
